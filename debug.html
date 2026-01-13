@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>League CV Service - Debug Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0e27;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #1e2847;
+        }
+
+        h1 {
+            color: #00d4ff;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .status.connected {
+            background: #00ff88;
+            color: #000;
+        }
+
+        .status.disconnected {
+            background: #ff4444;
+            color: #fff;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 350px 300px 450px;
+            gap: 20px;
+        }
+
+        .minimap-section {
+            background: #1a1f3a;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .canvas-container {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 600px;
+            padding: 20px;
+        }
+
+        canvas {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            image-rendering: pixelated; /* Keep sharp edges when scaled */
+            image-rendering: crisp-edges;
+        }
+
+        .stats-panel {
+            background: #1a1f3a;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-group {
+            margin-bottom: 25px;
+        }
+
+        .stat-group h3 {
+            color: #00d4ff;
+            font-size: 1.1em;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #2a3555;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 0.95em;
+        }
+
+        .stat-label {
+            color: #a0a8c0;
+        }
+
+        .stat-value {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .stat-value.good {
+            color: #00ff88;
+        }
+
+        .stat-value.warning {
+            color: #ffaa00;
+        }
+
+        .stat-value.bad {
+            color: #ff4444;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: #00d4ff;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #00b8e6;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .detections-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .detection-item {
+            background: #0f1428;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            border-radius: 4px;
+            border-left: 3px solid #00d4ff;
+            font-size: 0.85em;
+        }
+
+        .log-console {
+            background: #0a0e1a;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #1a1f35;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .screenshot-panel {
+            background: #1a1f3a;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .screenshot-preview {
+            background: #000;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .screenshot-preview img {
+            max-width: 100%;
+            border-radius: 4px;
+            border: 2px solid #00d4ff;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        .screenshot-info {
+            background: #0f1428;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            margin-top: 10px;
+        }
+
+        .log-time {
+            color: #666;
+            margin-right: 10px;
+        }
+
+        .legend {
+            margin-top: 20px;
+            padding: 15px;
+            background: #0f1428;
+            border-radius: 6px;
+        }
+
+        .legend h4 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+            font-size: 0.95em;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.85em;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .json-panel {
+            background: #1a1f3a;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .json-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2a3555;
+        }
+
+        .json-header h3 {
+            color: #00d4ff;
+            font-size: 1.1em;
+            margin: 0;
+        }
+
+        .json-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .json-controls button {
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+
+        .json-viewer {
+            flex: 1;
+            background: #0a0e1a;
+            border-radius: 6px;
+            padding: 15px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            color: #e0e0e0;
+            max-height: calc(100vh - 200px);
+        }
+
+        .json-viewer pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .json-stats {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #2a3555;
+            font-size: 0.85em;
+            color: #a0a8c0;
+        }
+
+        /* Responsive layout - stack vertically on smaller screens */
+        @media (max-width: 1600px) {
+            .main-content {
+                grid-template-columns: 1fr 450px;
+                grid-template-rows: auto auto;
+            }
+
+            .stats-panel {
+                grid-column: 1 / -1;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 20px;
+            }
+
+            .stat-group {
+                margin-bottom: 0;
+            }
+
+            .log-console {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+            }
+
+            .minimap-section,
+            .stats-panel,
+            .json-panel {
+                grid-column: 1;
+            }
+
+            .json-viewer {
+                max-height: 400px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            .controls button {
+                width: 100%;
+            }
+
+            .stats-panel {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>League CV Service - Debug Monitor</h1>
+            <div class="status disconnected" id="status">DISCONNECTED</div>
+        </header>
+
+        <div class="main-content">
+            <div class="minimap-section">
+                <div class="canvas-container">
+                    <canvas id="minimapCanvas" width="500" height="500"></canvas>
+                </div>
+
+                <div class="legend">
+                    <h4>Detection Legend</h4>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #00ff00;"></div>
+                        <span>Player Position</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #0099ff;"></div>
+                        <span>Allied Champions</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ff0000;"></div>
+                        <span>Enemy Champions</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ffff00;"></div>
+                        <span>Jungle Camps (Alive)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ff00ff;"></div>
+                        <span>Objectives</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ff8800;"></div>
+                        <span>Towers & Inhibitors</span>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button id="toggleBtn" onclick="toggleCapture()">Start Capture</button>
+                    <button onclick="clearCanvas()">Clear Overlay</button>
+                    <button onclick="reconnect()">Reconnect</button>
+                    <button onclick="recalibrate()">Recalibrate Minimap</button>
+                </div>
+            </div>
+
+            <!-- Screenshot Preview Panel -->
+            <div class="screenshot-panel">
+                <h3 style="color: #00d4ff; margin-bottom: 15px;">Capture Preview</h3>
+                <div class="screenshot-preview">
+                    <img id="screenshotPreview" src="" alt="No capture yet" style="display: none;">
+                    <div id="screenshotPlaceholder" style="color: #666; padding: 40px 10px;">
+                        Waiting for capture...
+                    </div>
+                </div>
+                <div class="screenshot-info">
+                    <div style="margin-bottom: 5px;">
+                        <strong style="color: #00d4ff;">Region:</strong>
+                        <span id="captureRegion">Not configured</span>
+                    </div>
+                    <div style="color: #888; font-size: 0.9em; margin-top: 8px;">
+                        This shows what the service is actually capturing and analyzing.
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-panel">
+                <div class="stat-group">
+                    <h3>Performance</h3>
+                    <div class="stat-item">
+                        <span class="stat-label">FPS:</span>
+                        <span class="stat-value" id="fps">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Processing Time:</span>
+                        <span class="stat-value" id="processingTime">0 ms</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Latency:</span>
+                        <span class="stat-value" id="latency">0 ms</span>
+                    </div>
+                </div>
+
+                <div class="stat-group">
+                    <h3>Detections</h3>
+                    <div class="stat-item">
+                        <span class="stat-label">Champions:</span>
+                        <span class="stat-value" id="champCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Jungle Camps:</span>
+                        <span class="stat-value" id="jungleCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Objectives:</span>
+                        <span class="stat-value" id="objCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Towers:</span>
+                        <span class="stat-value" id="towerCount">0</span>
+                    </div>
+                </div>
+
+                <div class="stat-group">
+                    <h3>Recent Detections</h3>
+                    <div class="detections-list" id="detectionsList">
+                        <div style="color: #666; text-align: center; padding: 20px;">
+                            No detections yet...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="log-console" id="logConsole">
+                    <div class="log-entry">
+                        <span class="log-time">[00:00:00]</span>
+                        <span>Waiting for connection...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="json-panel">
+                <div class="json-header">
+                    <h3>Raw JSON Response</h3>
+                    <div class="json-controls">
+                        <button onclick="copyJSON()">Copy</button>
+                        <button onclick="clearJSON()">Clear</button>
+                    </div>
+                </div>
+                <div class="json-viewer" id="jsonViewer">
+                    <pre style="color: #666;">Waiting for data...</pre>
+                </div>
+                <div class="json-stats">
+                    <div>Payload size: <span id="jsonSize">0 bytes</span></div>
+                    <div>Last updated: <span id="jsonTimestamp">--</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let capturing = false;
+        let captureInterval = null;
+        let canvas = document.getElementById('minimapCanvas');
+        let ctx = canvas.getContext('2d');
+        let lastFrameTime = Date.now();
+        let frameCount = 0;
+        let fpsHistory = [];
+        let lastJsonData = null;
+
+        // Summoner's Rift map data (static reference data)
+        // Coordinates are normalized to 0-100 range
+        const mapData = {
+            boundary: [
+                [10, 5], [50, 0], [95, 5], [100, 50], [95, 95],
+                [50, 100], [5, 95], [0, 50], [5, 10], [10, 5]
+            ],
+            lanes: {
+                top: [[10, 15], [20, 12], [40, 10], [60, 10], [80, 12], [90, 15]],
+                mid: [[15, 15], [30, 30], [50, 50], [70, 70], [85, 85]],
+                bot: [[15, 90], [25, 88], [45, 85], [65, 88], [85, 90]]
+            },
+            river: [
+                [70, 10], [60, 20], [50, 30], [40, 40],
+                [30, 50], [20, 60], [10, 70]
+            ]
+        };
+
+        // Connect to WebSocket
+        function connect() {
+            log('Connecting to ws://localhost:8765/ws...');
+            ws = new WebSocket('ws://localhost:8765/ws');
+
+            ws.onopen = () => {
+                log('Connected to CV service', 'good');
+                updateStatus(true);
+            };
+
+            ws.onclose = () => {
+                log('Disconnected from CV service', 'bad');
+                updateStatus(false);
+                if (capturing) {
+                    toggleCapture();
+                }
+            };
+
+            ws.onerror = (error) => {
+                log('WebSocket error', 'bad');
+                console.error(error);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    // Debug: Log what we're receiving
+                    if (data.structures) {
+                        console.log(`WebSocket received ${data.structures.length} structures:`, data.structures.slice(0, 3));
+                    } else {
+                        console.warn('WebSocket message has no structures field!', Object.keys(data));
+                    }
+                    handleAnalysisResponse(data);
+                } catch (e) {
+                    log('Failed to parse response: ' + e.message, 'bad');
+                }
+            };
+        }
+
+        function reconnect() {
+            if (ws) {
+                ws.close();
+            }
+            setTimeout(connect, 500);
+        }
+
+        async function recalibrate() {
+            log('Starting minimap recalibration...', 'warning');
+
+            try {
+                // Stop capture during calibration
+                const wasCapturing = capturing;
+                if (capturing) {
+                    toggleCapture();
+                }
+
+                // Call calibration endpoint
+                const response = await fetch('http://localhost:8765/calibrate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+
+                log(`Calibration complete! Region: (${result.minimapRegion[0]}, ${result.minimapRegion[1]}) ${result.minimapRegion[2]}x${result.minimapRegion[3]}`, 'good');
+
+                // Resume capture if it was active
+                if (wasCapturing) {
+                    setTimeout(() => toggleCapture(), 500);
+                }
+
+            } catch (error) {
+                log('Calibration failed: ' + error.message, 'bad');
+                console.error('Calibration error:', error);
+            }
+        }
+
+        function toggleCapture() {
+            capturing = !capturing;
+            const btn = document.getElementById('toggleBtn');
+
+            if (capturing) {
+                btn.textContent = 'Stop Capture';
+                btn.style.background = '#ff4444';
+                log('Started real-time capture', 'good');
+                startCapture();
+                startScreenshotPreview();
+            } else {
+                btn.textContent = 'Start Capture';
+                btn.style.background = '#00d4ff';
+                log('Stopped capture', 'warning');
+                stopCapture();
+                stopScreenshotPreview();
+            }
+        }
+
+        function startCapture() {
+            // Request analysis at 30 FPS
+            captureInterval = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    const sendTime = Date.now();
+                    ws.send(JSON.stringify({ requestTime: sendTime }));
+                }
+            }, 1000 / 30);
+        }
+
+        function stopCapture() {
+            if (captureInterval) {
+                clearInterval(captureInterval);
+                captureInterval = null;
+            }
+        }
+
+        // Fetch screenshot preview periodically
+        let screenshotInterval = null;
+
+        function startScreenshotPreview() {
+            updateScreenshot(); // Fetch immediately
+            screenshotInterval = setInterval(updateScreenshot, 2000); // Update every 2 seconds
+        }
+
+        function stopScreenshotPreview() {
+            if (screenshotInterval) {
+                clearInterval(screenshotInterval);
+                screenshotInterval = null;
+            }
+        }
+
+        async function updateScreenshot() {
+            try {
+                const response = await fetch('http://localhost:8765/screenshot');
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+
+                    const img = document.getElementById('screenshotPreview');
+                    const placeholder = document.getElementById('screenshotPlaceholder');
+
+                    // Revoke old URL to prevent memory leak
+                    if (img.src && img.src.startsWith('blob:')) {
+                        URL.revokeObjectURL(img.src);
+                    }
+
+                    img.src = url;
+                    img.style.display = 'block';
+                    placeholder.style.display = 'none';
+                } else if (response.status === 404) {
+                    // No screenshot available yet
+                    console.log('No screenshot available yet');
+                }
+            } catch (error) {
+                console.error('Failed to fetch screenshot:', error);
+            }
+        }
+
+        async function updateCaptureRegion() {
+            try {
+                const response = await fetch('http://localhost:8765/calibration');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.minimapRegion) {
+                        const [x, y, w, h] = data.minimapRegion;
+                        document.getElementById('captureRegion').textContent = `(${x}, ${y}) ${w}x${h}`;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to fetch calibration:', error);
+            }
+        }
+
+        function handleAnalysisResponse(data) {
+            // Store for JSON viewer
+            lastJsonData = data;
+            updateJSONViewer(data);
+
+            // Calculate FPS
+            const now = Date.now();
+            const deltaTime = (now - lastFrameTime) / 1000;
+            lastFrameTime = now;
+            const currentFps = 1 / deltaTime;
+
+            fpsHistory.push(currentFps);
+            if (fpsHistory.length > 30) fpsHistory.shift();
+            const avgFps = fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length;
+
+            // Update performance stats
+            document.getElementById('fps').textContent = avgFps.toFixed(1);
+            updateStatColor('fps', avgFps, 25, 15);
+
+            const procTime = data.processingTimeMs || 0;
+            document.getElementById('processingTime').textContent = procTime.toFixed(2) + ' ms';
+            updateStatColor('processingTime', procTime, 50, 100, true);
+
+            // Update detection counts
+            const champCount = (data.champions?.length || 0) + (data.playerPosition ? 1 : 0);
+            document.getElementById('champCount').textContent = champCount;
+            document.getElementById('jungleCount').textContent = data.jungleCamps?.length || 0;
+            document.getElementById('objCount').textContent = data.objectives?.length || 0;
+            document.getElementById('towerCount').textContent = data.structures?.length || 0;
+
+            // Draw on canvas
+            drawDetections(data);
+
+            // Update detections list
+            updateDetectionsList(data);
+        }
+
+        function drawDetections(data) {
+            // Use fixed canvas size for better visibility
+            const canvasSize = 1000; // Fixed display size (1000x1000)
+
+            if (canvas.width !== canvasSize || canvas.height !== canvasSize) {
+                canvas.width = canvasSize;
+                canvas.height = canvasSize;
+            }
+
+            // Clear canvas with full black (no trail effect for now)
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // IMPORTANT: Coordinates are normalized to 0-100 range by detectors
+            // We need to scale them to canvas size (1000x1000)
+            const coordinateRange = 100; // Detectors normalize to 0-100
+            const scale = canvas.width / coordinateRange; // Scale from 0-100 to 0-1000
+
+            // Debug logging (first frame only)
+            if (!window.debugLogged) {
+                console.log('Canvas size:', canvas.width, 'x', canvas.height);
+                console.log('Coordinate range: 0-100 (normalized)');
+                console.log('Scale factor:', scale, '(should be 10 for 1000px canvas)');
+                window.debugLogged = true;
+            }
+
+            // Draw player position (large green circle)
+            if (data.playerPosition) {
+                drawMarker(
+                    data.playerPosition.x * scale,
+                    data.playerPosition.y * scale,
+                    '#00ff00',
+                    12,
+                    'P'
+                );
+            }
+
+            // Draw champions
+            if (data.champions) {
+                data.champions.forEach(champ => {
+                    const color = champ.team === 'blue' ? '#0099ff' : '#ff0000';
+                    drawMarker(
+                        champ.position.x * scale,
+                        champ.position.y * scale,
+                        color,
+                        8
+                    );
+                });
+            }
+
+            // Draw jungle camps
+            if (data.jungleCamps) {
+                data.jungleCamps.forEach(camp => {
+                    const color = camp.status === 'alive' ? '#ffff00' : '#444444';
+                    drawMarker(
+                        camp.position.x * scale,
+                        camp.position.y * scale,
+                        color,
+                        6,
+                        camp.campType.charAt(0).toUpperCase()
+                    );
+                });
+            }
+
+            // Draw objectives
+            if (data.objectives) {
+                data.objectives.forEach(obj => {
+                    drawMarker(
+                        obj.position.x * scale,
+                        obj.position.y * scale,
+                        '#ff00ff',
+                        10,
+                        obj.objectiveType.charAt(0).toUpperCase()
+                    );
+                });
+            }
+
+            // Draw structures (towers and inhibitors) as squares
+            if (data.structures) {
+                console.log(`Drawing ${data.structures.length} structures`);
+                data.structures.forEach(structure => {
+                    const sx = structure.position.x * scale;
+                    const sy = structure.position.y * scale;
+
+                    // Color: ALL structures shown as BRIGHT ORANGE for visibility testing
+                    let fillColor = 'rgba(255, 165, 0, 0.95)';  // Bright orange
+                    let strokeColor = '#ff8800';  // Orange border
+
+                    if (!structure.isAlive) {
+                        // Destroyed structures: dark gray
+                        fillColor = 'rgba(50, 50, 50, 0.6)';
+                        strokeColor = '#666666';
+                    }
+
+                    // Size: 18px orange squares for visibility
+                    let size = 18; // default towers
+                    if (structure.structureType === 'nexus_turret') {
+                        size = 20;
+                    } else if (structure.structureType === 'inhibitor') {
+                        size = 22;
+                    }
+
+                    // Draw square
+                    ctx.fillStyle = fillColor;
+                    ctx.fillRect(sx - size/2, sy - size/2, size, size);
+
+                    // Draw thick border
+                    ctx.strokeStyle = strokeColor;
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(sx - size/2, sy - size/2, size, size);
+                });
+            }
+
+            // Draw individual minions
+            if (data.laneStates) {
+                data.laneStates.forEach(lane => {
+                    // Draw each individual minion as a small dot
+                    if (lane.minions) {
+                        lane.minions.forEach(minion => {
+                            const mx = minion.position.x * scale;
+                            const my = minion.position.y * scale;
+
+                            // Color: Blue for ORDER, Red for CHAOS
+                            const color = minion.team === 'ORDER' ? '#00bfff' : '#ff4444';
+
+                            // Draw minion dot (3px radius)
+                            ctx.beginPath();
+                            ctx.arc(mx, my, 3, 0, 2 * Math.PI);
+                            ctx.fillStyle = color;
+                            ctx.fill();
+
+                            // White outline for visibility
+                            ctx.strokeStyle = '#ffffff';
+                            ctx.lineWidth = 0.5;
+                            ctx.stroke();
+                        });
+                    }
+
+                    // Draw lane label with counts at wave center
+                    const x = lane.wavePosition.x * scale;
+                    const y = lane.wavePosition.y * scale;
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 10px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`${lane.lane.toUpperCase()}: ${lane.minionCount.ORDER}v${lane.minionCount.CHAOS}`, x, y);
+                });
+            }
+        }
+
+        function drawMarker(x, y, color, size, label = null) {
+            // Draw circle
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, 2 * Math.PI);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw label if provided
+            if (label) {
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, x, y);
+            }
+        }
+
+
+        function clearCanvas() {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            log('Canvas cleared');
+        }
+
+        function updateDetectionsList(data) {
+            const list = document.getElementById('detectionsList');
+            const detections = [];
+
+            if (data.playerPosition) {
+                detections.push(`Player at (${data.playerPosition.x.toFixed(0)}, ${data.playerPosition.y.toFixed(0)})`);
+            }
+
+            if (data.champions) {
+                data.champions.forEach(champ => {
+                    detections.push(`${champ.team} champion at (${champ.position.x.toFixed(0)}, ${champ.position.y.toFixed(0)})`);
+                });
+            }
+
+            if (detections.length === 0) {
+                list.innerHTML = '<div style="color: #666; text-align: center; padding: 20px;">No detections yet...</div>';
+            } else {
+                list.innerHTML = detections.slice(0, 10).map(d =>
+                    `<div class="detection-item">${d}</div>`
+                ).join('');
+            }
+        }
+
+        function updateStatColor(elementId, value, goodThreshold, badThreshold, inverse = false) {
+            const el = document.getElementById(elementId);
+            el.classList.remove('good', 'warning', 'bad');
+
+            if (inverse) {
+                if (value <= goodThreshold) el.classList.add('good');
+                else if (value <= badThreshold) el.classList.add('warning');
+                else el.classList.add('bad');
+            } else {
+                if (value >= goodThreshold) el.classList.add('good');
+                else if (value >= badThreshold) el.classList.add('warning');
+                else el.classList.add('bad');
+            }
+        }
+
+        function updateStatus(connected) {
+            const status = document.getElementById('status');
+            if (connected) {
+                status.textContent = 'CONNECTED';
+                status.className = 'status connected';
+            } else {
+                status.textContent = 'DISCONNECTED';
+                status.className = 'status disconnected';
+            }
+        }
+
+        function log(message, type = 'info') {
+            const console = document.getElementById('logConsole');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+
+            let color = '#a0a8c0';
+            if (type === 'good') color = '#00ff88';
+            if (type === 'warning') color = '#ffaa00';
+            if (type === 'bad') color = '#ff4444';
+
+            entry.innerHTML = `<span class="log-time">[${time}]</span><span style="color: ${color}">${message}</span>`;
+            console.appendChild(entry);
+            console.scrollTop = console.scrollHeight;
+
+            // Keep only last 50 entries
+            while (console.children.length > 50) {
+                console.removeChild(console.firstChild);
+            }
+        }
+
+        function updateJSONViewer(data) {
+            const viewer = document.getElementById('jsonViewer');
+            const jsonString = JSON.stringify(data, null, 2);
+
+            // Syntax highlighting
+            const highlighted = jsonString
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"([^"]+)":/g, '<span style="color: #79c0ff;">"$1"</span>:')
+                .replace(/: "([^"]+)"/g, ': <span style="color: #a5d6a7;">"$1"</span>')
+                .replace(/: (\d+\.?\d*)/g, ': <span style="color: #ff9800;">$1</span>')
+                .replace(/: (true|false|null)/g, ': <span style="color: #f48fb1;">$1</span>');
+
+            viewer.innerHTML = `<pre>${highlighted}</pre>`;
+
+            // Update stats
+            const size = new Blob([jsonString]).size;
+            document.getElementById('jsonSize').textContent = size + ' bytes';
+            document.getElementById('jsonTimestamp').textContent = new Date().toLocaleTimeString();
+        }
+
+        function copyJSON() {
+            if (!lastJsonData) {
+                log('No JSON data to copy', 'warning');
+                return;
+            }
+
+            const jsonString = JSON.stringify(lastJsonData, null, 2);
+            navigator.clipboard.writeText(jsonString).then(() => {
+                log('JSON copied to clipboard', 'good');
+            }).catch(err => {
+                log('Failed to copy JSON: ' + err.message, 'bad');
+            });
+        }
+
+        function clearJSON() {
+            document.getElementById('jsonViewer').innerHTML = '<pre style="color: #666;">Cleared. Waiting for new data...</pre>';
+            document.getElementById('jsonSize').textContent = '0 bytes';
+            document.getElementById('jsonTimestamp').textContent = '--';
+            log('JSON viewer cleared');
+        }
+
+        // Auto-connect on load
+        connect();
+        updateCaptureRegion(); // Load minimap region info
+    </script>
+</body>
+</html>

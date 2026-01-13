@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+
+# Claude Code
+.claude/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model weights (large files)
+src/models/weights/*.pt
+src/models/weights/*.pth
+
+# Test fixtures
+tests/fixtures/*.png
+tests/fixtures/*.jpg
+
+# Build artifacts
+*.spec
+dist/
+build/

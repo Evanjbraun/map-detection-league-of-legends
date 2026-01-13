@@ -1,0 +1,33 @@
+# Web Framework & Communication
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+websockets==12.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Computer Vision
+opencv-python==4.8.1.78
+numpy==1.24.3
+pillow==10.1.0
+mss==9.0.1                # Ultra-fast screen capture (100+ FPS)
+
+# OCR (Optional - for respawn timers)
+pytesseract==0.3.10
+easyocr==1.7.0
+
+# Machine Learning (Optional - for champion detection)
+# ultralytics==8.0.200    # YOLO v8 (uncomment if needed)
+# torch==2.1.0+cpu        # CPU-only PyTorch
+# torchvision==0.16.0+cpu
+
+# Utilities
+python-dotenv==1.0.0
+loguru==0.7.2
+httpx==0.25.2
+
+# Performance
+orjson==3.9.10            # Faster JSON serialization
+msgpack==1.0.7            # Binary serialization (faster than JSON)
+
+# Build/Deploy
+pyinstaller==6.3.0
