@@ -45,6 +45,12 @@ class StructureDetector(BaseDetector):
         # Use distance from diagonal line (y = 100 - x) to determine lanes
         self.nexus_distance_threshold = 15  # Within 15 units of base corner = nexus tower
 
+        # Performance optimization: cache tower positions
+        # Towers don't move, so we only need to detect them occasionally
+        self.cached_structures = []
+        self.frames_since_full_scan = 0
+        self.full_scan_interval = 30  # Only do full template matching every 30 frames (~1 second at 30 FPS)
+
     def initialize(self) -> None:
         """Initialize structure detector and load templates"""
         logger.info("Initializing StructureDetector...")
@@ -88,7 +94,7 @@ class StructureDetector(BaseDetector):
 
     def detect(self, minimap: np.ndarray) -> List[Structure]:
         """
-        Detect all structures using template matching
+        Detect all structures using template matching with caching
 
         Args:
             minimap: OpenCV BGR image of minimap
@@ -99,6 +105,17 @@ class StructureDetector(BaseDetector):
         if minimap is None or minimap.size == 0:
             logger.warning("StructureDetector received empty minimap")
             return []
+
+        # Use cached results most of the time (towers don't move!)
+        self.frames_since_full_scan += 1
+
+        if self.frames_since_full_scan < self.full_scan_interval and self.cached_structures:
+            logger.debug(f"🏰 Using cached tower positions (frame {self.frames_since_full_scan}/{self.full_scan_interval})")
+            return self.cached_structures
+
+        # Time for a full scan
+        logger.debug("🏰 Performing full tower template matching scan...")
+        self.frames_since_full_scan = 0
 
         height, width = minimap.shape[:2]
         structures = []
@@ -115,11 +132,14 @@ class StructureDetector(BaseDetector):
             logger.info(f"🏰 StructureDetector found {len(structures)} structures "
                        f"({len(blue_detections)} ORDER, {len(red_detections)} CHAOS)")
 
+            # Cache the results
+            self.cached_structures = structures
+
         except Exception as e:
             logger.error(f"StructureDetector error: {e}")
             import traceback
             traceback.print_exc()
-            return []
+            return self.cached_structures if self.cached_structures else []
 
         return structures
 
