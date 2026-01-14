@@ -140,7 +140,6 @@ class StructureDetector(BaseDetector):
             return self.cached_structures
 
         # Time for a full scan
-        logger.debug("🏰 Performing full tower template matching scan...")
         self.frames_since_full_scan = 0
 
         height, width = minimap.shape[:2]
@@ -223,11 +222,6 @@ class StructureDetector(BaseDetector):
 
                 detections.append((center_x, center_y, confidence, template_name))
 
-        # Log the best confidence scores even if no matches
-        if not detections:
-            top_3 = sorted(max_confidences, key=lambda x: x[1], reverse=True)[:3]
-            logger.debug(f"  {team} - No matches above threshold {self.match_threshold}. Top confidences: "
-                        f"{[(name, f'{conf:.3f}') for name, conf in top_3]}")
 
         # Apply non-maximum suppression to remove duplicate detections
         filtered_detections = self._non_max_suppression(detections)
@@ -236,8 +230,6 @@ class StructureDetector(BaseDetector):
         if len(filtered_detections) > self.max_detections_per_team:
             logger.warning(f"  {team} - Too many detections ({len(filtered_detections)}), limiting to top {self.max_detections_per_team} by confidence")
             filtered_detections = sorted(filtered_detections, key=lambda d: d[2], reverse=True)[:self.max_detections_per_team]
-
-        logger.info(f"  {team} - After NMS and filtering: {len(filtered_detections)} structures")
 
         # Convert to Structure objects
         structures = []

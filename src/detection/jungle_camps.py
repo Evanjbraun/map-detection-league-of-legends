@@ -95,18 +95,14 @@ class JungleCampDetector(BaseDetector):
             if self.jungle_template is not None:
                 jungle_detections = self._match_template(minimap_gray, minimap_hsv, self.jungle_template, "jungle")
                 all_detections.extend(jungle_detections)
-                logger.debug(f"Found {len(jungle_detections)} regular camp detections")
 
             # Match buff camps (dragon head icon)
             if self.buff_template is not None:
                 buff_detections = self._match_template(minimap_gray, minimap_hsv, self.buff_template, "buff")
                 all_detections.extend(buff_detections)
-                logger.debug(f"Found {len(buff_detections)} buff camp detections")
 
             # Apply NMS across all detections (both templates)
             all_detections = self._non_max_suppression(all_detections, threshold=20)
-
-            logger.info(f"After NMS: {len(all_detections)} total jungle camps detected")
 
             # Convert to normalized coordinates
             normalized_detections = []
@@ -148,8 +144,6 @@ class JungleCampDetector(BaseDetector):
         # Find matches above threshold
         locations = np.where(result >= self.match_threshold)
 
-        logger.debug(f"{template_name}: Found {len(locations[0])} raw template matches")
-
         # Collect all detections with color validation
         template_h, template_w = template.shape
 
@@ -181,9 +175,6 @@ class JungleCampDetector(BaseDetector):
             # Require at least 3 orange pixels to be a valid jungle camp
             if orange_pixels >= 3:
                 detections.append((center_x, center_y, confidence))
-                logger.debug(f"  {template_name} accepted: ({center_x}, {center_y}) conf={confidence:.3f} orange_px={orange_pixels}")
-            else:
-                logger.debug(f"  {template_name} rejected: ({center_x}, {center_y}) - only {orange_pixels} orange pixels")
 
         return detections
 
@@ -245,7 +236,6 @@ class JungleCampDetector(BaseDetector):
                 respawnTimer=None,
                 confidence=float(conf)
             ))
-            logger.debug(f"  SCUTTLE at {river_side}: ({x_norm:.1f}, {y_norm:.1f})")
 
         # Sort ORDER camps by Y coordinate (top to bottom)
         order_camps.sort(key=lambda c: c[1])
@@ -262,7 +252,6 @@ class JungleCampDetector(BaseDetector):
                 respawnTimer=None,
                 confidence=float(conf)
             ))
-            logger.debug(f"  ORDER camp #{i}: {camp_type} at ({x_norm:.1f}, {y_norm:.1f})")
 
         # Sort CHAOS camps by Y coordinate (top to bottom)
         chaos_camps.sort(key=lambda c: c[1])
@@ -279,9 +268,6 @@ class JungleCampDetector(BaseDetector):
                 respawnTimer=None,
                 confidence=float(conf)
             ))
-            logger.debug(f"  CHAOS camp #{i}: {camp_type} at ({x_norm:.1f}, {y_norm:.1f})")
-
-        logger.info(f"Classified {len(scuttle_camps)} scuttles, {len(order_camps)} ORDER camps, {len(chaos_camps)} CHAOS camps")
 
         return camps
 

@@ -860,13 +860,34 @@
             // Draw objectives
             if (data.objectives) {
                 data.objectives.forEach(obj => {
+                    const x = obj.position.x * scale;
+                    const y = obj.position.y * scale;
+
                     drawMarker(
-                        obj.position.x * scale,
-                        obj.position.y * scale,
+                        x,
+                        y,
                         '#ff00ff',
                         7,  // Scaled down from 10
-                        obj.objectiveType.charAt(0).toUpperCase()
+                        obj.type ? obj.type.charAt(0).toUpperCase() : 'O'
                     );
+
+                    // Draw text label with objective type (e.g., "dragon", "baron", "herald")
+                    if (obj.type) {
+                        const label = obj.type;
+                        ctx.fillStyle = '#ff00ff';  // Purple text
+                        ctx.font = 'bold 8px Arial';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
+
+                        // Position text to the right of the marker
+                        ctx.fillText(label, x + 8, y);
+
+                        // Add a dark outline for better visibility
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 2;
+                        ctx.strokeText(label, x + 8, y);
+                        ctx.fillText(label, x + 8, y);  // Re-draw on top of outline
+                    }
                 });
             }
 
