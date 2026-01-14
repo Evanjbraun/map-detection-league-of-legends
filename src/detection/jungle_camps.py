@@ -23,29 +23,42 @@ class JungleCampDetector(BaseDetector):
 
     def __init__(self):
         super().__init__()
-        self.template = None
+        self.jungle_template = None  # Regular camps (diamond icon)
+        self.buff_template = None     # Buff camps (dragon head icon)
         self.match_threshold = 0.70  # Start with stricter threshold
 
     def initialize(self) -> None:
-        """Load the jungle camp template"""
+        """Load both jungle camp templates"""
         logger.info("Initializing JungleCampDetector...")
         super().initialize()
 
         from config import PROJECT_ROOT
 
-        # Load the jungleMob template
-        template_path = PROJECT_ROOT / "models" / "templates" / "camps" / "jungleMob.jpg"
+        templates_dir = PROJECT_ROOT / "models" / "templates" / "camps"
 
-        if template_path.exists():
-            img = cv2.imread(str(template_path))
+        # Load the jungleMob template (regular camps - diamond icon)
+        jungle_path = templates_dir / "jungleMob.jpg"
+        if jungle_path.exists():
+            img = cv2.imread(str(jungle_path))
             if img is not None:
-                # Convert to grayscale for template matching
-                self.template = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                logger.info(f"Loaded jungle template: {template_path.name} ({img.shape[1]}x{img.shape[0]} px)")
+                self.jungle_template = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                logger.info(f"Loaded jungle template: {jungle_path.name} ({img.shape[1]}x{img.shape[0]} px)")
             else:
-                logger.error(f"Failed to load template: {template_path}")
+                logger.error(f"Failed to load jungle template: {jungle_path}")
         else:
-            logger.error(f"Template not found: {template_path}")
+            logger.error(f"Jungle template not found: {jungle_path}")
+
+        # Load the buffMob template (buff camps - dragon head icon)
+        buff_path = templates_dir / "buffMob.jpg"
+        if buff_path.exists():
+            img = cv2.imread(str(buff_path))
+            if img is not None:
+                self.buff_template = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                logger.info(f"Loaded buff template: {buff_path.name} ({img.shape[1]}x{img.shape[0]} px)")
+            else:
+                logger.error(f"Failed to load buff template: {buff_path}")
+        else:
+            logger.error(f"Buff template not found: {buff_path}")
 
     def detect(self, minimap: np.ndarray) -> List[JungleCamp]:
         """
@@ -60,8 +73,8 @@ class JungleCampDetector(BaseDetector):
         if minimap is None or minimap.size == 0:
             return []
 
-        if self.template is None:
-            logger.warning("No template loaded, skipping jungle camp detection")
+        if self.jungle_template is None and self.buff_template is None:
+            logger.warning("No templates loaded, skipping jungle camp detection")
             return []
 
         camps = []
@@ -75,58 +88,29 @@ class JungleCampDetector(BaseDetector):
             # Also convert to HSV for color validation
             minimap_hsv = cv2.cvtColor(minimap, cv2.COLOR_BGR2HSV)
 
-            # Perform template matching
-            result = cv2.matchTemplate(minimap_gray, self.template, cv2.TM_CCOEFF_NORMED)
+            # Collect all detections from both templates
+            all_detections = []
 
-            # Find matches above threshold
-            locations = np.where(result >= self.match_threshold)
+            # Match regular jungle camps (diamond icon)
+            if self.jungle_template is not None:
+                jungle_detections = self._match_template(minimap_gray, minimap_hsv, self.jungle_template, "jungle")
+                all_detections.extend(jungle_detections)
+                logger.debug(f"Found {len(jungle_detections)} regular camp detections")
 
-            logger.debug(f"Found {len(locations[0])} raw template matches")
+            # Match buff camps (dragon head icon)
+            if self.buff_template is not None:
+                buff_detections = self._match_template(minimap_gray, minimap_hsv, self.buff_template, "buff")
+                all_detections.extend(buff_detections)
+                logger.debug(f"Found {len(buff_detections)} buff camp detections")
 
-            # Collect all detections with color validation
-            detections = []
-            template_h, template_w = self.template.shape
+            # Apply NMS across all detections (both templates)
+            all_detections = self._non_max_suppression(all_detections, threshold=20)
 
-            for pt in zip(*locations[::-1]):  # Switch x and y
-                x, y = pt
-                confidence = result[y, x]
-
-                # Get center of detection
-                center_x = x + template_w // 2
-                center_y = y + template_h // 2
-
-                # COLOR VALIDATION: Check if this detection has orange color
-                # Jungle camps are orange on the minimap
-                check_radius = 4  # Check slightly larger area
-                x1 = max(0, center_x - check_radius)
-                y1 = max(0, center_y - check_radius)
-                x2 = min(width, center_x + check_radius)
-                y2 = min(height, center_y + check_radius)
-
-                roi_hsv = minimap_hsv[y1:y2, x1:x2]
-
-                # Orange/gold color range for jungle camps
-                # H: 10-25 (orange), S: 120-255 (saturated), V: 120-255 (bright)
-                lower_orange = np.array([10, 120, 120])
-                upper_orange = np.array([25, 255, 255])
-                orange_mask = cv2.inRange(roi_hsv, lower_orange, upper_orange)
-                orange_pixels = cv2.countNonZero(orange_mask)
-
-                # Require at least 3 orange pixels to be a valid jungle camp
-                if orange_pixels >= 3:
-                    detections.append((center_x, center_y, confidence))
-                    logger.debug(f"  Accepted: ({center_x}, {center_y}) conf={confidence:.3f} orange_px={orange_pixels}")
-                else:
-                    logger.debug(f"  Rejected: ({center_x}, {center_y}) - only {orange_pixels} orange pixels (need 3+)")
-
-            # Apply non-maximum suppression to remove duplicates
-            detections = self._non_max_suppression(detections, threshold=20)
-
-            logger.info(f"After NMS: {len(detections)} jungle camps detected")
+            logger.info(f"After NMS: {len(all_detections)} total jungle camps detected")
 
             # Convert to normalized coordinates
             normalized_detections = []
-            for x, y, conf in detections:
+            for x, y, conf in all_detections:
                 x_norm = (x / width) * 100
                 y_norm = (y / height) * 100
                 normalized_detections.append((x_norm, y_norm, conf))
@@ -140,6 +124,68 @@ class JungleCampDetector(BaseDetector):
             traceback.print_exc()
 
         return camps
+
+    def _match_template(self, minimap_gray: np.ndarray, minimap_hsv: np.ndarray,
+                       template: np.ndarray, template_name: str) -> List[tuple]:
+        """
+        Match a single template against the minimap with color validation
+
+        Args:
+            minimap_gray: Grayscale minimap
+            minimap_hsv: HSV minimap for color validation
+            template: Grayscale template to match
+            template_name: Name for logging ("jungle" or "buff")
+
+        Returns:
+            List of (x, y, confidence) detections
+        """
+        height, width = minimap_gray.shape[:2]
+        detections = []
+
+        # Perform template matching
+        result = cv2.matchTemplate(minimap_gray, template, cv2.TM_CCOEFF_NORMED)
+
+        # Find matches above threshold
+        locations = np.where(result >= self.match_threshold)
+
+        logger.debug(f"{template_name}: Found {len(locations[0])} raw template matches")
+
+        # Collect all detections with color validation
+        template_h, template_w = template.shape
+
+        for pt in zip(*locations[::-1]):  # Switch x and y
+            x, y = pt
+            confidence = result[y, x]
+
+            # Get center of detection
+            center_x = x + template_w // 2
+            center_y = y + template_h // 2
+
+            # COLOR VALIDATION: Check if this detection has orange color
+            # Jungle camps are orange on the minimap
+            check_radius = 4  # Check slightly larger area
+            x1 = max(0, center_x - check_radius)
+            y1 = max(0, center_y - check_radius)
+            x2 = min(width, center_x + check_radius)
+            y2 = min(height, center_y + check_radius)
+
+            roi_hsv = minimap_hsv[y1:y2, x1:x2]
+
+            # Orange/gold color range for jungle camps
+            # H: 10-25 (orange), S: 120-255 (saturated), V: 120-255 (bright)
+            lower_orange = np.array([10, 120, 120])
+            upper_orange = np.array([25, 255, 255])
+            orange_mask = cv2.inRange(roi_hsv, lower_orange, upper_orange)
+            orange_pixels = cv2.countNonZero(orange_mask)
+
+            # Require at least 3 orange pixels to be a valid jungle camp
+            if orange_pixels >= 3:
+                detections.append((center_x, center_y, confidence))
+                logger.debug(f"  {template_name} accepted: ({center_x}, {center_y}) conf={confidence:.3f} orange_px={orange_pixels}")
+            else:
+                logger.debug(f"  {template_name} rejected: ({center_x}, {center_y}) - only {orange_pixels} orange pixels")
+
+        return detections
 
     def _classify_camps(self, detections: List[tuple]) -> List[JungleCamp]:
         """
@@ -164,21 +210,47 @@ class JungleCampDetector(BaseDetector):
         camps = []
         order_camps = []
         chaos_camps = []
+        scuttle_camps = []
 
         # Separate by team using diagonal line (y = x)
+        # River is along the diagonal, so camps near the diagonal are scuttles
         # In OpenCV coords: Y increases downward
         # ORDER (bottom-left): y > x (further down and left)
         # CHAOS (top-right): y < x (further up and right)
         for x_norm, y_norm, conf in detections:
-            if y_norm > x_norm:  # Below diagonal = ORDER (bottom-left quadrant)
+            # Calculate distance from diagonal line (y = x)
+            diagonal_distance = abs(y_norm - x_norm)
+
+            # If near diagonal (river), it's a scuttle crab
+            # Scuttles spawn in river, which is along the diagonal
+            if diagonal_distance < 8:  # Within 8 units of diagonal = river/scuttle
+                # Determine which river based on position along diagonal
+                # Top-right river vs bottom-left river
+                if x_norm + y_norm < 100:  # Upper river (top-left half)
+                    scuttle_camps.append((x_norm, y_norm, conf, "TOP_RIVER"))
+                else:  # Lower river (bottom-right half)
+                    scuttle_camps.append((x_norm, y_norm, conf, "BOT_RIVER"))
+            elif y_norm > x_norm:  # Below diagonal = ORDER (bottom-left quadrant)
                 order_camps.append((x_norm, y_norm, conf))
             else:  # Above diagonal = CHAOS (top-right quadrant)
                 chaos_camps.append((x_norm, y_norm, conf))
 
+        # Process scuttle crabs first
+        for x_norm, y_norm, conf, river_side in scuttle_camps:
+            camps.append(JungleCamp(
+                position=Position(x=x_norm, y=y_norm),
+                type="scuttle",
+                side=river_side,
+                status="alive",
+                respawnTimer=None,
+                confidence=float(conf)
+            ))
+            logger.debug(f"  SCUTTLE at {river_side}: ({x_norm:.1f}, {y_norm:.1f})")
+
         # Sort ORDER camps by Y coordinate (top to bottom)
         order_camps.sort(key=lambda c: c[1])
-        # ORDER camp order (top to bottom): blue_buff, gromp, wolves, red_buff, raptors, krugs
-        order_types = ["blue_buff", "gromp", "wolves", "red_buff", "raptors", "krugs"]
+        # ORDER camp order (top to bottom): gromp, blue_buff, wolves, raptors, red_buff, krugs
+        order_types = ["gromp", "blue_buff", "wolves", "raptors", "red_buff", "krugs"]
 
         for i, (x_norm, y_norm, conf) in enumerate(order_camps):
             camp_type = order_types[i] if i < len(order_types) else "gromp"
@@ -194,8 +266,8 @@ class JungleCampDetector(BaseDetector):
 
         # Sort CHAOS camps by Y coordinate (top to bottom)
         chaos_camps.sort(key=lambda c: c[1])
-        # CHAOS camp order (top to bottom): krugs, raptors, red_buff, wolves, gromp, blue_buff
-        chaos_types = ["krugs", "raptors", "red_buff", "wolves", "gromp", "blue_buff"]
+        # CHAOS camp order (top to bottom): krugs, red_buff, raptors, wolves, blue_buff, gromp
+        chaos_types = ["krugs", "red_buff", "raptors", "wolves", "blue_buff", "gromp"]
 
         for i, (x_norm, y_norm, conf) in enumerate(chaos_camps):
             camp_type = chaos_types[i] if i < len(chaos_types) else "gromp"
@@ -209,7 +281,7 @@ class JungleCampDetector(BaseDetector):
             ))
             logger.debug(f"  CHAOS camp #{i}: {camp_type} at ({x_norm:.1f}, {y_norm:.1f})")
 
-        logger.info(f"Classified {len(order_camps)} ORDER camps, {len(chaos_camps)} CHAOS camps")
+        logger.info(f"Classified {len(scuttle_camps)} scuttles, {len(order_camps)} ORDER camps, {len(chaos_camps)} CHAOS camps")
 
         return camps
 
