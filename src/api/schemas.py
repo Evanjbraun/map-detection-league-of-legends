@@ -17,9 +17,9 @@ class ChampionSighting(BaseModel):
 
 
 class JungleCamp(BaseModel):
-    type: Literal["blue_buff", "gromp", "wolves", "red_buff", "raptors", "krugs"]
+    type: Literal["blue_buff", "gromp", "wolves", "red_buff", "raptors", "krugs", "scuttle"]
     position: Position
-    side: Literal["ORDER", "CHAOS"]
+    side: Literal["ORDER", "CHAOS", "TOP_RIVER", "BOT_RIVER"]
     status: Literal["alive", "cleared", "respawning"]
     respawnTimer: Optional[float] = None
     confidence: float = Field(..., ge=0.0, le=1.0)

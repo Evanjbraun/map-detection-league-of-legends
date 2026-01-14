@@ -57,8 +57,20 @@
 
         .main-content {
             display: grid;
-            grid-template-columns: 1fr 350px 300px 450px;
+            grid-template-columns: 1fr 450px;
             gap: 20px;
+        }
+
+        .left-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .detection-row {
+            display: grid;
+            grid-template-columns: auto 150px;
+            gap: 15px;
         }
 
         .minimap-section {
@@ -75,8 +87,9 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 600px;
-            padding: 20px;
+            min-height: 400px;
+            max-height: 500px;
+            padding: 10px;
         }
 
         canvas {
@@ -241,16 +254,16 @@
         }
 
         .legend {
-            margin-top: 20px;
+            background: #1a1f3a;
+            border-radius: 8px;
             padding: 15px;
-            background: #0f1428;
-            border-radius: 6px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
         .legend h4 {
             color: #00d4ff;
             margin-bottom: 10px;
-            font-size: 0.95em;
+            font-size: 0.9em;
         }
 
         .legend-item {
@@ -261,9 +274,9 @@
         }
 
         .legend-color {
-            width: 20px;
-            height: 20px;
-            border-radius: 4px;
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
             margin-right: 10px;
             border: 2px solid rgba(255, 255, 255, 0.3);
         }
@@ -399,119 +412,103 @@
         </header>
 
         <div class="main-content">
-            <div class="minimap-section">
-                <div class="canvas-container">
-                    <canvas id="minimapCanvas" width="500" height="500"></canvas>
-                </div>
+            <div class="left-column">
+                <!-- Detection Overlay + Legend Row -->
+                <div class="detection-row">
+                    <div class="minimap-section">
+                        <h3 style="color: #00d4ff; margin-bottom: 10px; font-size: 1em;">Detection Overlay</h3>
+                        <div class="canvas-container">
+                            <canvas id="minimapCanvas" width="300" height="300"></canvas>
+                        </div>
+                    </div>
 
-                <div class="legend">
-                    <h4>Detection Legend</h4>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #00ff00;"></div>
-                        <span>Player Position</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #0099ff;"></div>
-                        <span>Allied Champions</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #ff0000;"></div>
-                        <span>Enemy Champions</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #ffff00;"></div>
-                        <span>Jungle Camps (Alive)</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #ff00ff;"></div>
-                        <span>Objectives</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #ff8800;"></div>
-                        <span>Towers & Inhibitors</span>
-                    </div>
-                </div>
-
-                <div class="controls">
-                    <button id="toggleBtn" onclick="toggleCapture()">Start Capture</button>
-                    <button onclick="clearCanvas()">Clear Overlay</button>
-                    <button onclick="reconnect()">Reconnect</button>
-                    <button onclick="recalibrate()">Recalibrate Minimap</button>
-                </div>
-            </div>
-
-            <!-- Screenshot Preview Panel -->
-            <div class="screenshot-panel">
-                <h3 style="color: #00d4ff; margin-bottom: 15px;">Capture Preview</h3>
-                <div class="screenshot-preview">
-                    <img id="screenshotPreview" src="" alt="No capture yet" style="display: none;">
-                    <div id="screenshotPlaceholder" style="color: #666; padding: 40px 10px;">
-                        Waiting for capture...
-                    </div>
-                </div>
-                <div class="screenshot-info">
-                    <div style="margin-bottom: 5px;">
-                        <strong style="color: #00d4ff;">Region:</strong>
-                        <span id="captureRegion">Not configured</span>
-                    </div>
-                    <div style="color: #888; font-size: 0.9em; margin-top: 8px;">
-                        This shows what the service is actually capturing and analyzing.
-                    </div>
-                </div>
-            </div>
-
-            <div class="stats-panel">
-                <div class="stat-group">
-                    <h3>Performance</h3>
-                    <div class="stat-item">
-                        <span class="stat-label">FPS:</span>
-                        <span class="stat-value" id="fps">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Processing Time:</span>
-                        <span class="stat-value" id="processingTime">0 ms</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Latency:</span>
-                        <span class="stat-value" id="latency">0 ms</span>
-                    </div>
-                </div>
-
-                <div class="stat-group">
-                    <h3>Detections</h3>
-                    <div class="stat-item">
-                        <span class="stat-label">Champions:</span>
-                        <span class="stat-value" id="champCount">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Jungle Camps:</span>
-                        <span class="stat-value" id="jungleCount">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Objectives:</span>
-                        <span class="stat-value" id="objCount">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Towers:</span>
-                        <span class="stat-value" id="towerCount">0</span>
-                    </div>
-                </div>
-
-                <div class="stat-group">
-                    <h3>Recent Detections</h3>
-                    <div class="detections-list" id="detectionsList">
-                        <div style="color: #666; text-align: center; padding: 20px;">
-                            No detections yet...
+                    <div class="legend">
+                        <h4>Legend</h4>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #00ff00;"></div>
+                            <span>Player</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #0099ff;"></div>
+                            <span>Allies</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #ff0000;"></div>
+                            <span>Enemies</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #ffff00;"></div>
+                            <span>Jungle</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #ff00ff;"></div>
+                            <span>Objectives</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #ff8800;"></div>
+                            <span>Towers</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="log-console" id="logConsole">
-                    <div class="log-entry">
-                        <span class="log-time">[00:00:00]</span>
-                        <span>Waiting for connection...</span>
+                <!-- Capture Preview and Performance Row -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; overflow: hidden;">
+                    <!-- Capture Preview -->
+                    <div style="background: #1a1f3a; border-radius: 10px; padding: 12px; min-width: 0;">
+                        <h3 style="color: #00d4ff; margin-bottom: 8px; font-size: 0.95em;">Capture Preview</h3>
+                        <div class="screenshot-preview" style="background: #000; border-radius: 6px; min-height: 100px; max-height: 120px; display: flex; align-items: center; justify-content: center;">
+                            <img id="screenshotPreview" src="" alt="No capture yet" style="display: none; max-width: 100%; max-height: 120px;">
+                            <div id="screenshotPlaceholder" style="color: #666; font-size: 0.85em;">
+                                Waiting for capture...
+                            </div>
+                        </div>
+                        <div style="margin-top: 8px; font-size: 0.8em; color: #888;">
+                            <strong style="color: #00d4ff;">Region:</strong> <span id="captureRegion">Not configured</span>
+                        </div>
+                    </div>
+
+                    <!-- Performance & Controls -->
+                    <div style="background: #1a1f3a; border-radius: 10px; padding: 12px; min-width: 0;">
+                        <h3 style="color: #00d4ff; margin-bottom: 8px; font-size: 0.95em;">Performance</h3>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 10px; font-size: 0.9em;">
+                            <div class="stat-item">
+                                <span class="stat-label">FPS:</span>
+                                <span class="stat-value" id="fps">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Processing:</span>
+                                <span class="stat-value" id="processingTime">0 ms</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Champions:</span>
+                                <span class="stat-value" id="champCount">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Towers:</span>
+                                <span class="stat-value" id="towerCount">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Jungle:</span>
+                                <span class="stat-value" id="jungleCount">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Objectives:</span>
+                                <span class="stat-value" id="objCount">0</span>
+                            </div>
+                        </div>
+
+                        <div class="controls" style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                            <button id="toggleBtn" onclick="toggleCapture()" style="grid-column: 1 / -1;">Start Capture</button>
+                            <button onclick="clearCanvas()">Clear</button>
+                            <button onclick="reconnect()">Reconnect</button>
+                            <button onclick="recalibrate()" style="grid-column: 1 / -1;">Recalibrate</button>
+                        </div>
                     </div>
                 </div>
+
+                <!-- Hidden elements for JavaScript compatibility -->
+                <div id="detectionsList" style="display: none;"></div>
+                <div id="logConsole" style="display: none;"></div>
             </div>
 
             <div class="json-panel">
@@ -776,8 +773,8 @@
         }
 
         function drawDetections(data) {
-            // Use fixed canvas size for better visibility
-            const canvasSize = 1000; // Fixed display size (1000x1000)
+            // Use compact canvas size to match HTML
+            const canvasSize = 300; // Matches HTML canvas declaration (300x300)
 
             if (canvas.width !== canvasSize || canvas.height !== canvasSize) {
                 canvas.width = canvasSize;
@@ -789,15 +786,15 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // IMPORTANT: Coordinates are normalized to 0-100 range by detectors
-            // We need to scale them to canvas size (1000x1000)
+            // We need to scale them to canvas size (300x300)
             const coordinateRange = 100; // Detectors normalize to 0-100
-            const scale = canvas.width / coordinateRange; // Scale from 0-100 to 0-1000
+            const scale = canvas.width / coordinateRange; // Scale from 0-100 to 0-300
 
             // Debug logging (first frame only)
             if (!window.debugLogged) {
                 console.log('Canvas size:', canvas.width, 'x', canvas.height);
                 console.log('Coordinate range: 0-100 (normalized)');
-                console.log('Scale factor:', scale, '(should be 10 for 1000px canvas)');
+                console.log('Scale factor:', scale, '(should be 3 for 300px canvas)');
                 window.debugLogged = true;
             }
 
@@ -807,7 +804,7 @@
                     data.playerPosition.x * scale,
                     data.playerPosition.y * scale,
                     '#00ff00',
-                    12,
+                    8,  // Scaled down from 12 for 300px canvas
                     'P'
                 );
             }
@@ -820,7 +817,7 @@
                         champ.position.x * scale,
                         champ.position.y * scale,
                         color,
-                        8
+                        6  // Scaled down from 8
                     );
                 });
             }
@@ -829,13 +826,34 @@
             if (data.jungleCamps) {
                 data.jungleCamps.forEach(camp => {
                     const color = camp.status === 'alive' ? '#ffff00' : '#444444';
+                    const x = camp.position.x * scale;
+                    const y = camp.position.y * scale;
+
                     drawMarker(
-                        camp.position.x * scale,
-                        camp.position.y * scale,
+                        x,
+                        y,
                         color,
-                        6,
-                        camp.campType.charAt(0).toUpperCase()
+                        5,  // Scaled down from 6
+                        camp.type ? camp.type.charAt(0).toUpperCase() : 'C'
                     );
+
+                    // Draw text label: "TEAM_CAMP_TYPE" (e.g., "CHAOS_wolves")
+                    if (camp.side && camp.type) {
+                        const label = `${camp.side}_${camp.type}`;
+                        ctx.fillStyle = '#ffff00';  // Yellow text
+                        ctx.font = 'bold 8px Arial';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
+
+                        // Position text to the right of the marker
+                        ctx.fillText(label, x + 8, y);
+
+                        // Add a dark outline for better visibility
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 2;
+                        ctx.strokeText(label, x + 8, y);
+                        ctx.fillText(label, x + 8, y);  // Re-draw on top of outline
+                    }
                 });
             }
 
@@ -846,7 +864,7 @@
                         obj.position.x * scale,
                         obj.position.y * scale,
                         '#ff00ff',
-                        10,
+                        7,  // Scaled down from 10
                         obj.objectiveType.charAt(0).toUpperCase()
                     );
                 });
@@ -869,12 +887,12 @@
                         strokeColor = '#666666';
                     }
 
-                    // Size: 18px orange squares for visibility
-                    let size = 18; // default towers
+                    // Size: Larger squares for 300px canvas (was 18px for 1000px canvas)
+                    let size = 12; // default towers (proportional to smaller canvas)
                     if (structure.structureType === 'nexus_turret') {
-                        size = 20;
+                        size = 14;
                     } else if (structure.structureType === 'inhibitor') {
-                        size = 22;
+                        size = 16;
                     }
 
                     // Draw square
