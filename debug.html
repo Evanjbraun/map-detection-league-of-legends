@@ -810,15 +810,50 @@
             }
 
             // Draw champions
-            if (data.champions) {
+            if (data.champions && data.champions.length > 0) {
+                console.log(`Rendering ${data.champions.length} champions:`, data.champions);
                 data.champions.forEach(champ => {
-                    const color = champ.team === 'blue' ? '#0099ff' : '#ff0000';
+                    const x = champ.position.x * scale;
+                    const y = champ.position.y * scale;
+
+                    // Team colors: ORDER = blue, CHAOS = red, UNKNOWN = gray
+                    let color = '#888888';  // Default gray for UNKNOWN
+                    if (champ.team === 'ORDER') {
+                        color = '#00ccff';  // Cyan/blue for ORDER
+                    } else if (champ.team === 'CHAOS') {
+                        color = '#ff3333';  // Red for CHAOS
+                    }
+
+                    // Player champion gets a special color (green)
+                    if (champ.isPlayer) {
+                        color = '#00ff00';  // Bright green for player
+                    }
+
                     drawMarker(
-                        champ.position.x * scale,
-                        champ.position.y * scale,
+                        x,
+                        y,
                         color,
-                        6  // Scaled down from 8
+                        6,  // Scaled down from 8
+                        champ.championName ? champ.championName.charAt(0).toUpperCase() : 'C'
                     );
+
+                    // Draw champion name label
+                    if (champ.championName) {
+                        const label = champ.championName;
+                        ctx.fillStyle = color;
+                        ctx.font = 'bold 8px Arial';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
+
+                        // Position text to the right of the marker
+                        ctx.fillText(label, x + 8, y);
+
+                        // Add dark outline for visibility
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 2;
+                        ctx.strokeText(label, x + 8, y);
+                        ctx.fillText(label, x + 8, y);  // Re-draw on top of outline
+                    }
                 });
             }
 

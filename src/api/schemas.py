@@ -10,6 +10,7 @@ class Position(BaseModel):
 
 
 class ChampionSighting(BaseModel):
+    championName: str
     position: Position
     team: Literal["ORDER", "CHAOS", "UNKNOWN"]
     isPlayer: bool
