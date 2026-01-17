@@ -111,6 +111,11 @@ class JungleCampDetector(BaseDetector):
                 y_norm = (y / height) * 100
                 normalized_detections.append((x_norm, y_norm, conf))
 
+            # Log raw detections for position mapping
+            logger.debug(f"🔍 Raw camp detections ({len(normalized_detections)} total):")
+            for x_norm, y_norm, conf in sorted(normalized_detections, key=lambda d: (d[1], d[0])):
+                logger.debug(f"   ({x_norm:.1f}, {y_norm:.1f}) conf={conf:.2f}")
+
             # Classify camps by position
             camps = self._classify_camps(normalized_detections)
 
@@ -180,17 +185,11 @@ class JungleCampDetector(BaseDetector):
 
     def _classify_camps(self, detections: List[tuple]) -> List[JungleCamp]:
         """
-        Classify jungle camps by their position
+        Classify jungle camps by matching detections to known fixed positions.
 
-        Coordinate system (0-100 normalized):
-        - (0, 0) = top-left corner
-        - (100, 100) = bottom-right corner
-        - ORDER base: bottom-left at (0, 100)
-        - CHAOS base: top-right at (100, 0)
-
-        Main diagonal: from top-left (0,0) to bottom-right (100,100), equation: y = x
-        - ORDER side: below/left of diagonal (y > x means higher Y value = lower on screen = ORDER)
-        - CHAOS side: above/right of diagonal (y < x means lower Y value = higher on screen = CHAOS)
+        Each camp has a unique, fixed position on the map. We match each detection
+        to the closest expected position. This prevents classification shifting
+        when camps are dead/missing.
 
         Args:
             detections: List of (x_norm, y_norm, confidence) tuples
@@ -198,76 +197,71 @@ class JungleCampDetector(BaseDetector):
         Returns:
             List of classified JungleCamp objects
         """
+        # Fixed camp positions from actual game data
+        # Format: "SIDE_type": (x, y)
+        EXPECTED_POSITIONS = {
+            # ORDER side camps (top to bottom by Y)
+            "ORDER_gromp": (13.8, 43.8),
+            "ORDER_blue_buff": (24.3, 47.1),
+            "ORDER_wolves": (24.8, 56.4),
+            "ORDER_raptors": (46.0, 64.0),
+            "ORDER_red_buff": (50.7, 73.3),
+            "ORDER_krugs": (55.0, 81.9),
+
+            # CHAOS side camps (top to bottom by Y)
+            "CHAOS_krugs": (42.4, 18.6),
+            "CHAOS_red_buff": (46.0, 27.4),
+            "CHAOS_raptors": (51.2, 36.2),
+            "CHAOS_wolves": (72.4, 44.3),
+            "CHAOS_blue_buff": (72.4, 53.8),
+            "CHAOS_gromp": (83.1, 56.9),
+
+            # Scuttle crabs
+            "TOP_RIVER_scuttle": (28.6, 36.0),
+            "BOT_RIVER_scuttle": (69.0, 65.2),
+        }
+
         camps = []
-        order_camps = []
-        chaos_camps = []
-        scuttle_camps = []
+        matched_camps = set()  # Track which expected camps have been matched
 
-        # Separate by team using diagonal line (y = x)
-        # River is along the diagonal, so camps near the diagonal are scuttles
-        # In OpenCV coords: Y increases downward
-        # ORDER (bottom-left): y > x (further down and left)
-        # CHAOS (top-right): y < x (further up and right)
+        # Match each detection to the closest expected camp position
         for x_norm, y_norm, conf in detections:
-            # Calculate distance from diagonal line (y = x)
-            diagonal_distance = abs(y_norm - x_norm)
+            best_match = None
+            best_distance = float('inf')
 
-            # If near diagonal (river), it's a scuttle crab
-            # Scuttles spawn in river, which is along the diagonal
-            if diagonal_distance < 8:  # Within 8 units of diagonal = river/scuttle
-                # Determine which river based on position along diagonal
-                # Top-right river vs bottom-left river
-                if x_norm + y_norm < 100:  # Upper river (top-left half)
-                    scuttle_camps.append((x_norm, y_norm, conf, "TOP_RIVER"))
-                else:  # Lower river (bottom-right half)
-                    scuttle_camps.append((x_norm, y_norm, conf, "BOT_RIVER"))
-            elif y_norm > x_norm:  # Below diagonal = ORDER (bottom-left quadrant)
-                order_camps.append((x_norm, y_norm, conf))
-            else:  # Above diagonal = CHAOS (top-right quadrant)
-                chaos_camps.append((x_norm, y_norm, conf))
+            for camp_key, (exp_x, exp_y) in EXPECTED_POSITIONS.items():
+                if camp_key in matched_camps:
+                    continue  # Already matched this camp
 
-        # Process scuttle crabs first
-        for x_norm, y_norm, conf, river_side in scuttle_camps:
-            camps.append(JungleCamp(
-                position=Position(x=x_norm, y=y_norm),
-                type="scuttle",
-                side=river_side,
-                status="alive",
-                respawnTimer=None,
-                confidence=float(conf)
-            ))
+                distance = np.sqrt((x_norm - exp_x)**2 + (y_norm - exp_y)**2)
+                if distance < best_distance:
+                    best_distance = distance
+                    best_match = camp_key
 
-        # Sort ORDER camps by Y coordinate (top to bottom)
-        order_camps.sort(key=lambda c: c[1])
-        # ORDER camp order (top to bottom): gromp, blue_buff, wolves, raptors, red_buff, krugs
-        order_types = ["gromp", "blue_buff", "wolves", "raptors", "red_buff", "krugs"]
+            # Only accept match if within tolerance (5 units)
+            if best_match and best_distance < 5:
+                matched_camps.add(best_match)
 
-        for i, (x_norm, y_norm, conf) in enumerate(order_camps):
-            camp_type = order_types[i] if i < len(order_types) else "gromp"
-            camps.append(JungleCamp(
-                position=Position(x=x_norm, y=y_norm),
-                type=camp_type,
-                side="ORDER",
-                status="alive",
-                respawnTimer=None,
-                confidence=float(conf)
-            ))
+                # Parse camp key to get side and type
+                parts = best_match.split("_")
+                if "scuttle" in best_match:
+                    side = parts[0] + "_" + parts[1]  # "TOP_RIVER" or "BOT_RIVER"
+                    camp_type = "scuttle"
+                else:
+                    side = parts[0]  # "ORDER" or "CHAOS"
+                    camp_type = "_".join(parts[1:])  # "gromp", "blue_buff", etc.
 
-        # Sort CHAOS camps by Y coordinate (top to bottom)
-        chaos_camps.sort(key=lambda c: c[1])
-        # CHAOS camp order (top to bottom): krugs, red_buff, raptors, wolves, blue_buff, gromp
-        chaos_types = ["krugs", "red_buff", "raptors", "wolves", "blue_buff", "gromp"]
-
-        for i, (x_norm, y_norm, conf) in enumerate(chaos_camps):
-            camp_type = chaos_types[i] if i < len(chaos_types) else "gromp"
-            camps.append(JungleCamp(
-                position=Position(x=x_norm, y=y_norm),
-                type=camp_type,
-                side="CHAOS",
-                status="alive",
-                respawnTimer=None,
-                confidence=float(conf)
-            ))
+                camps.append(JungleCamp(
+                    position=Position(x=x_norm, y=y_norm),
+                    type=camp_type,
+                    side=side,
+                    status="alive",
+                    respawnTimer=None,
+                    confidence=float(conf)
+                ))
+            else:
+                # Detection doesn't match any known camp - log it
+                logger.debug(f"   Unmatched detection at ({x_norm:.1f}, {y_norm:.1f}) - closest camp distance: {best_distance:.1f}")
 
         return camps
 
