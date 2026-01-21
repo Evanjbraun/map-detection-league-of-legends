@@ -111,11 +111,6 @@ class JungleCampDetector(BaseDetector):
                 y_norm = (y / height) * 100
                 normalized_detections.append((x_norm, y_norm, conf))
 
-            # Log raw detections for position mapping
-            logger.debug(f"🔍 Raw camp detections ({len(normalized_detections)} total):")
-            for x_norm, y_norm, conf in sorted(normalized_detections, key=lambda d: (d[1], d[0])):
-                logger.debug(f"   ({x_norm:.1f}, {y_norm:.1f}) conf={conf:.2f}")
-
             # Classify camps by position
             camps = self._classify_camps(normalized_detections)
 
@@ -259,9 +254,6 @@ class JungleCampDetector(BaseDetector):
                     respawnTimer=None,
                     confidence=float(conf)
                 ))
-            else:
-                # Detection doesn't match any known camp - log it
-                logger.debug(f"   Unmatched detection at ({x_norm:.1f}, {y_norm:.1f}) - closest camp distance: {best_distance:.1f}")
 
         return camps
 

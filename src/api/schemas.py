@@ -1,12 +1,21 @@
 """Pydantic models matching the JSON contract"""
 
 from typing import List, Optional, Literal, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
+
+
+def round4(v: float) -> float:
+    """Round float to 4 decimal places"""
+    return round(v, 4)
 
 
 class Position(BaseModel):
     x: float = Field(..., ge=0, le=100)
     y: float = Field(..., ge=0, le=100)
+
+    @field_serializer('x', 'y')
+    def serialize_coords(self, v: float) -> float:
+        return round4(v)
 
 
 class ChampionSighting(BaseModel):
@@ -15,6 +24,10 @@ class ChampionSighting(BaseModel):
     team: Literal["ORDER", "CHAOS", "UNKNOWN"]
     isPlayer: bool
     confidence: float = Field(..., ge=0.0, le=1.0)
+
+    @field_serializer('confidence')
+    def serialize_confidence(self, v: float) -> float:
+        return round4(v)
 
 
 class JungleCamp(BaseModel):
@@ -25,6 +38,10 @@ class JungleCamp(BaseModel):
     respawnTimer: Optional[float] = None
     confidence: float = Field(..., ge=0.0, le=1.0)
 
+    @field_serializer('confidence')
+    def serialize_confidence(self, v: float) -> float:
+        return round4(v)
+
 
 class Objective(BaseModel):
     type: Literal["dragon", "baron", "herald"]
@@ -32,6 +49,10 @@ class Objective(BaseModel):
     status: Literal["alive", "dead", "respawning"]
     respawnTimer: Optional[float] = None
     confidence: float = Field(..., ge=0.0, le=1.0)
+
+    @field_serializer('confidence')
+    def serialize_confidence(self, v: float) -> float:
+        return round4(v)
 
 
 class MinionCount(BaseModel):
@@ -44,6 +65,10 @@ class Minion(BaseModel):
     team: Literal["ORDER", "CHAOS"]
     confidence: float = Field(..., ge=0.0, le=1.0)
 
+    @field_serializer('confidence')
+    def serialize_confidence(self, v: float) -> float:
+        return round4(v)
+
 
 class LaneState(BaseModel):
     lane: Literal["top", "mid", "bot"]
@@ -52,6 +77,10 @@ class LaneState(BaseModel):
     minionCount: MinionCount
     minions: List[Minion] = Field(default_factory=list)  # Individual minion positions
     confidence: float = Field(..., ge=0.0, le=1.0)
+
+    @field_serializer('confidence')
+    def serialize_confidence(self, v: float) -> float:
+        return round4(v)
 
 
 class TowerSummary(BaseModel):
@@ -68,6 +97,10 @@ class Tower(BaseModel):
     status: Literal["alive", "destroyed"]
     confidence: float = Field(..., ge=0.0, le=1.0)
 
+    @field_serializer('confidence')
+    def serialize_confidence(self, v: float) -> float:
+        return round4(v)
+
 
 class Structure(BaseModel):
     """Structures include towers and inhibitors"""
@@ -77,6 +110,10 @@ class Structure(BaseModel):
     lane: Literal["top", "mid", "bot", "nexus"]  # nexus for nexus turrets
     isAlive: bool
     confidence: float = Field(..., ge=0.0, le=1.0)
+
+    @field_serializer('confidence')
+    def serialize_confidence(self, v: float) -> float:
+        return round4(v)
 
 
 class MinimapResolution(BaseModel):
@@ -101,3 +138,7 @@ class CVAnalysisResponse(BaseModel):
     towers: TowerSummary = Field(default_factory=TowerSummary)  # Compact summary for LLM
     structures: List[Structure] = Field(default_factory=list)  # Detailed tower data
     metadata: Metadata
+
+    @field_serializer('processingTimeMs')
+    def serialize_processing_time(self, v: float) -> float:
+        return round4(v)

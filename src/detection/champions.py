@@ -346,10 +346,6 @@ class ChampionDetector(BaseDetector):
                     confidence=float(conf)
                 ))
 
-            if champions:
-                logger.debug(f"✅ Returning {len(champions)} champion sightings")
-                for champ in champions:
-                    logger.debug(f"   - {champ.championName} at ({champ.position.x:.1f}, {champ.position.y:.1f}) team={champ.team} conf={champ.confidence:.2f}")
 
         except Exception as e:
             logger.error(f"Error in champion detection: {e}")

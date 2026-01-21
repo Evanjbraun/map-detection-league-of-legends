@@ -10,6 +10,7 @@ Priority: SPEED
 """
 
 import json
+import logging
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -17,6 +18,9 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+
+# Suppress uvicorn's verbose WebSocket DEBUG logs (< TEXT '...' [N bytes])
+logging.getLogger("uvicorn.protocols.websockets.websockets_impl").setLevel(logging.WARNING)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from loguru import logger
@@ -171,6 +175,35 @@ async def health():
         "active_connections": len(active_websockets),
         "protocol": settings.PROTOCOL
     }
+
+
+@app.get("/templates/champions/{champion_name}")
+async def get_champion_icon(champion_name: str):
+    """
+    Serve champion template images for debug monitor
+
+    Normalizes champion name (lowercase, no spaces/apostrophes) to match template filenames
+    Tries multiple file extensions (.jpg, .png, .webp)
+    """
+    templates_dir = PROJECT_ROOT / "models" / "templates" / "champions"
+
+    # Normalize champion name to match template filenames
+    # "Kai'Sa" -> "kaisa", "Lee Sin" -> "leesin", "Brand" -> "brand"
+    normalized_name = champion_name.replace("'", "").replace(" ", "").lower()
+
+    # Try different extensions
+    for ext in [".jpg", ".png", ".webp"]:
+        icon_path = templates_dir / f"{normalized_name}{ext}"
+        if icon_path.exists():
+            return FileResponse(
+                icon_path,
+                media_type=f"image/{ext[1:]}",  # Remove the dot
+                headers={"Cache-Control": "public, max-age=86400"}  # Cache for 24 hours
+            )
+
+    # Return 404 if not found
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail=f"Champion icon not found: {champion_name} (normalized: {normalized_name})")
 
 
 @app.websocket("/ws")

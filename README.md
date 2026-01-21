@@ -1,322 +1,290 @@
 # League CV Service
 
-Real-time computer vision service for League of Legends minimap analysis. Captures and analyzes the in-game minimap at 30 FPS to detect champion positions, jungle camps, objectives, towers, and lane states.
+Real-time computer vision service for League of Legends minimap analysis. Captures and analyzes the in-game minimap to detect champion positions, jungle camps, objectives, and structures.
 
-**Tech Stack:** FastAPI, WebSockets, OpenCV, NumPy, MSS (screen capture), Pydantic
+**Tech Stack:** Python, FastAPI, WebSockets, OpenCV, NumPy, MSS (screen capture), Pydantic
+
+## Features
+
+- **Champion Detection** - Identifies all 10 champions in-game using Riot's local API + template matching
+- **Jungle Camp Tracking** - Detects all jungle camps with position-based classification
+- **Objective Detection** - Dragon, Baron, Herald status
+- **Structure Detection** - Tower and inhibitor states
+- **Real-time Streaming** - WebSocket API for low-latency updates (~10 FPS, 100ms)
+- **Debug Monitor** - Live visualization at http://localhost:8765/debug
 
 ## Quick Start
 
 ```bash
-# Install
+# Create virtual environment
 python -m venv venv
-.\venv\Scripts\activate
+.\venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/Mac
+
+# Install dependencies
 pip install -r requirements.txt
 
-# Run (normal mode)
-.\run_dev.bat
-
-# Run with debug overlay (recommended for development)
-.\run_dev_debug.bat
+# Run the service
+python src/main.py
 ```
 
-Expected output:
-```
-🚀 League CV Service v1.0.0
-📡 Protocol: WEBSOCKET
-✅ Detection pipeline ready
-```
-
-## Minimap Detection
-
-The service automatically detects your League minimap using **edge/shape-based computer vision** - no manual setup required!
-
-### How Auto-Detection Works
-
-**Automatic detection** is enabled by default (`AUTO_DETECT_MINIMAP=true`):
-- Uses Canny edge detection to find the minimap border
-- Looks for rectangular shape in bottom-right quadrant
-- Validates size (200-600px range) and color variation
-- **Robust to GPU settings** (saturation, contrast, gamma) because it detects structure, not colors
-
-**On first run:**
-1. Start a League game (Practice Tool recommended)
-2. Run `.\run_dev.bat`
-3. Service automatically detects minimap region
-4. If detection fails, falls back to manual calibration
-
-### Manual Calibration Fallback
-
-If auto-detection fails, a semi-transparent **GREEN window** appears:
-1. **Drag it over your minimap** (drag from center)
-2. **Resize to fit** (drag from edges/corners)
-3. Click **LOCK** → **SAVE**
-4. Service continues running automatically!
-
-**Need to recalibrate?** Click the **"Recalibrate Minimap"** button in the debug monitor anytime (http://localhost:8765/debug).
-
-### Testing Auto-Detection
-
-Test the auto-detection on a screenshot:
-```bash
-cd src
-python test_autodetect.py path/to/screenshot.png
-```
-
-This will show detected coordinates and save an annotated image.
-
-## Debug Tools
-
-### 1. Debug Overlay Window (New!)
-
-**When to use:** Active development, testing detection algorithms in-game
-
-**Start with:**
-```bash
-.\run_dev_debug.bat
-# or
-python src/main.py --debug
-```
-
-**Features:**
-- Semi-transparent draggable window
-- Shows live JSON responses (last 5 scans)
-- Scan stats: processing time, errors, timestamp
-- Play/Pause button to freeze output
-- Auto-scrolling text display
-
-**Perfect for:** Seeing raw detection data while playing League on a second monitor.
-
-### 2. Debug Web Page
-
-**When to use:** Visual debugging, tuning detection parameters
-
-**Access:** http://localhost:8765/debug
-
-**Features:**
-- Live minimap capture with detection overlays
-- Performance metrics (FPS, processing time, latency)
-- Color-coded markers: 🟢 Player, 🔵 Allies, 🔴 Enemies, 🟡 Jungle camps, 🟣 Objectives, 🔵 Towers
-- Detection counts and recent detections list
-- **Raw JSON viewer** with syntax highlighting (live-updated with each frame)
-- Copy/Clear controls for easy JSON inspection
-- Console log for connection status and events
-
-**Usage:**
-1. Start the service: `.\run_dev_debug.bat`
-2. Open http://localhost:8765/debug on your second monitor
-3. Start League (Practice Tool recommended)
-4. Click "Start Capture" - you'll see 30 FPS live updates with JSON payloads in the right panel
+Then open http://localhost:8765/debug in your browser.
 
 ## API Usage
 
 ### WebSocket (Recommended)
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8765/ws');
-
-ws.onopen = () => ws.send('{}');  // Request analysis
+const ws = new WebSocket('ws://127.0.0.1:8765/ws');
 
 ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
     console.log('Champions:', data.champions);
-    console.log('Processing:', data.processingTimeMs + 'ms');
+    console.log('Jungle Camps:', data.jungleCamps);
+    console.log('Structures:', data.structures);
 };
 
-// Request at 30 FPS
+// Request analysis (send any message to trigger)
 setInterval(() => {
-    if (ws.readyState === WebSocket.OPEN) ws.send('{}');
-}, 1000 / 30);
+    if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ requestTime: Date.now() }));
+    }
+}, 100);  // 10 FPS
 ```
 
 ### HTTP REST
 
 ```bash
-curl -X POST http://localhost:8765/analyze
+# Single analysis
+curl -X POST http://127.0.0.1:8765/analyze
+
+# Health check
+curl http://127.0.0.1:8765/health
+
+# Get current calibration
+curl http://127.0.0.1:8765/calibration
 ```
 
-### Response Format
+## Response Format
 
-```javascript
+```json
 {
-    "timestamp": 1234567890,
-    "processingTimeMs": 12.3,
-    "playerPosition": { "x": 128, "y": 234 },
+    "timestamp": 1705789200000,
+    "processingTimeMs": 45.2,
     "champions": [
-        { "championId": "unknown", "position": { "x": 145, "y": 220 }, "team": "blue", "confidence": 0.8 }
+        {
+            "championName": "Ahri",
+            "position": { "x": 45.5, "y": 62.3 },
+            "team": "ORDER",
+            "isPlayer": true,
+            "confidence": 0.92
+        }
     ],
     "jungleCamps": [
-        { "campType": "blue_buff", "position": { "x": 67, "y": 89 }, "status": "alive", "confidence": 0.9 }
+        {
+            "type": "blue_buff",
+            "position": { "x": 24.3, "y": 47.1 },
+            "side": "ORDER",
+            "status": "alive",
+            "confidence": 0.88
+        }
     ],
-    "objectives": [...],
-    "laneStates": [...],
-    "towers": [...],
-    "metadata": { "minimapResolution": { "width": 250, "height": 250 }, "detectionErrors": [] }
+    "objectives": [
+        {
+            "type": "dragon",
+            "position": { "x": 50.0, "y": 70.0 },
+            "status": "alive",
+            "confidence": 0.95
+        }
+    ],
+    "structures": [
+        {
+            "structureType": "outer_turret",
+            "position": { "x": 15.0, "y": 50.0 },
+            "team": "ORDER",
+            "lane": "top",
+            "isAlive": true,
+            "confidence": 1.0
+        }
+    ],
+    "towers": {
+        "ORDER": { "top": 3, "mid": 3, "bot": 3 },
+        "CHAOS": { "top": 3, "mid": 3, "bot": 3 }
+    },
+    "metadata": {
+        "minimapResolution": { "width": 420, "height": 420 },
+        "detectionErrors": []
+    }
 }
 ```
 
+**Coordinate System:** All positions are normalized to 0-100 range where (0,0) is top-left and (100,100) is bottom-right of the minimap.
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Service info and available endpoints |
+| `/health` | GET | Health check with uptime and connection count |
+| `/debug` | GET | Debug visualization page |
+| `/analyze` | POST | Single HTTP analysis request |
+| `/ws` | WebSocket | Real-time streaming (recommended) |
+| `/calibration` | GET | Current minimap region settings |
+| `/calibrate` | POST | Trigger minimap recalibration |
+| `/screenshot` | GET | Latest minimap capture (JPEG) |
+| `/templates/champions/{name}` | GET | Champion icon images |
+
 ## Configuration
 
-Copy `.env.example` to `.env`:
+Create a `.env` file in the project root:
 
 ```env
 # Server
 HOST=127.0.0.1
 PORT=8765
+DEBUG=true
+LOG_LEVEL=INFO
 
-# Performance
-TARGET_FPS=30                    # 0 = unlimited
-MAX_PROCESSING_TIME_MS=50
-
-# Feature toggles
+# Detection Features
 ENABLE_CHAMPION_DETECTION=true
 ENABLE_JUNGLE_DETECTION=true
 ENABLE_OBJECTIVE_DETECTION=true
-ENABLE_LANE_DETECTION=true
 ENABLE_TOWER_DETECTION=true
 
-# Screen capture
-AUTO_DETECT_MINIMAP=true
-MINIMAP_CORNER=bottom_right
+# Performance
+TARGET_FPS=30
+MAX_PROCESSING_TIME_MS=50
 
-# Manual coordinates (if auto-detect fails)
-MINIMAP_X=1600
-MINIMAP_Y=800
-MINIMAP_WIDTH=250
-MINIMAP_HEIGHT=250
+# Screen Capture
+CAPTURE_METHOD=mss
+AUTO_DETECT_MINIMAP=false
+
+# Manual Minimap Calibration (if auto-detect is off)
+MINIMAP_X=2134
+MINIMAP_Y=1003
+MINIMAP_WIDTH=420
+MINIMAP_HEIGHT=420
+
+# Serialization (json for debugging, msgpack for production)
+SERIALIZATION_FORMAT=json
 ```
 
-## Development Workflow
+## Debug Monitor
 
-**Real-time iteration:**
-1. Start service: `.\run_dev.bat`
-2. Open debug page: http://localhost:8765/debug (2nd monitor)
-3. Start League Practice Tool
-4. Edit code in `src/processing/pipeline.py`
-5. Service auto-reloads → see changes instantly on debug canvas
+Access http://localhost:8765/debug while the service is running to see:
 
-**Example - Implement champion detection:**
+- Live minimap visualization with detection overlays
+- Champion icons with team-colored borders
+- Jungle camp markers
+- Structure positions
+- Real-time JSON output
+- FPS and processing time metrics
 
-```python
-# In src/processing/pipeline.py (line ~172)
+## Debug Logging
 
-async def _detect_champions(self, minimap: np.ndarray):
-    """Detect champion positions using color + blob detection"""
-    hsv = cv2.cvtColor(minimap, cv2.COLOR_BGR2HSV)
-
-    # Blue team detection
-    blue_lower = np.array([100, 100, 100])
-    blue_upper = np.array([130, 255, 255])
-    blue_mask = cv2.inRange(hsv, blue_lower, blue_upper)
-
-    contours, _ = cv2.findContours(blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    champions = []
-    for cnt in contours:
-        if cv2.contourArea(cnt) > 5:
-            M = cv2.moments(cnt)
-            if M["m00"] != 0:
-                cx = int(M["m10"] / M["m00"])
-                cy = int(M["m01"] / M["m00"])
-                champions.append(ChampionSighting(
-                    championId="unknown",
-                    position=Position(x=cx, y=cy),
-                    team="blue",
-                    confidence=0.8
-                ))
-
-    return champions
-```
-
-Save and watch blue dots appear on the debug canvas!
+When `DEBUG=true`, the service logs JSON output to `logs/cv_output_*.jsonl`:
+- Logs every 5 seconds
+- Keeps maximum 3 log files
+- Useful for reviewing detection output after stopping the service
 
 ## Project Structure
 
 ```
 league-cv-service/
 ├── src/
-│   ├── main.py              # FastAPI server + WebSocket/HTTP endpoints
-│   ├── config.py            # Settings (Pydantic)
+│   ├── main.py              # FastAPI server, WebSocket endpoint
+│   ├── config.py            # Pydantic settings
 │   ├── api/
 │   │   ├── routes.py        # HTTP endpoints
-│   │   └── schemas.py       # Response models
+│   │   └── schemas.py       # Response models (Pydantic)
 │   ├── capture/
-│   │   └── screen.py        # MSS screen capture (100+ FPS)
-│   ├── processing/
-│   │   └── pipeline.py      # ⭐ Main detection pipeline - IMPLEMENT HERE
-│   └── models/
-│       ├── templates/       # Template images
-│       └── weights/         # ML model weights
-├── debug.html               # Real-time debug visualization
+│   │   └── screen.py        # MSS screen capture
+│   ├── detection/
+│   │   ├── base.py          # Base detector class
+│   │   ├── champions.py     # Champion detection (Riot API + templates)
+│   │   ├── jungle_camps.py  # Jungle camp detection
+│   │   ├── objectives.py    # Dragon/Baron/Herald detection
+│   │   └── structures.py    # Tower/inhibitor detection
+│   └── processing/
+│       └── pipeline.py      # Detection pipeline orchestrator
+├── models/
+│   └── templates/
+│       ├── champions/       # Champion icon templates (.png)
+│       ├── camps/           # Jungle camp templates
+│       └── objectives/      # Objective templates
+├── logs/                    # Debug JSON output (auto-created)
+├── debug.html               # Debug visualization page
 ├── requirements.txt
-├── .env.example
-└── run_dev.bat
+└── .env
 ```
 
-## API Endpoints
+## How It Works
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Service info |
-| `/health` | GET | Health check |
-| `/debug` | GET | Debug visualization page |
-| `/analyze` | POST | HTTP analysis |
-| `/ws` | WebSocket | Real-time streaming |
-| `/docs` | GET | Swagger docs |
+1. **Screen Capture** - MSS captures the minimap region at high speed (~2ms)
+2. **Champion Detection** - Fetches current game champions from Riot's local API (127.0.0.1:2999), loads only those 10 templates, uses template matching
+3. **Jungle Camps** - Template matching with orange color validation, position-based classification to fixed camp locations
+4. **Objectives** - Template matching for Dragon, Baron, Herald icons
+5. **Structures** - Fixed position detection for towers and inhibitors
+6. **Output** - JSON via WebSocket or HTTP with normalized coordinates (0-100)
 
-## Performance Targets
+## Performance
 
-| Metric | Target | Good | Bad |
-|--------|--------|------|-----|
-| FPS | 30 | >25 | <15 |
-| Processing Time | <50ms | <50ms | >100ms |
-| Screen Capture | <10ms | <10ms | >20ms |
+| Metric | Typical Value |
+|--------|---------------|
+| Processing Time | 80-120ms |
+| Effective FPS | ~10 |
+| Screen Capture | ~2ms |
 
-**Optimizations:** MSS capture (~2ms/frame), parallel detection (asyncio), WebSocket, msgpack serialization, configurable features, timeout protection
+This is sufficient for macro game state tracking - champion positions, jungle timers, objective control. You don't need 60 FPS for strategic analysis.
 
-## Current Status
+## Requirements
 
-**✅ Complete:**
-- FastAPI server (WebSocket + HTTP)
-- Screen capture (MSS)
-- Detection pipeline orchestrator
-- API schemas
-- Debug visualization tool
-- Config system
-- **Minimap auto-detection** (edge/shape-based CV)
+- Python 3.10+
+- Windows (for MSS screen capture)
+- League of Legends running (for Riot API champion data)
 
-**⏳ TODO:**
-- Implement detection algorithms in `src/processing/pipeline.py`:
-  - Champion detection (color + blob)
-  - Jungle camps (template matching + color)
-  - Objectives (Dragon/Baron/Herald)
-  - Lane states (minion waves)
-  - Towers (template matching)
-  - OCR for timers
+## Building On This Service
+
+This service is designed to be consumed by other applications:
+
+```python
+# Python client example
+import websocket
+import json
+
+def on_message(ws, message):
+    data = json.loads(message)
+    # Process game state...
+    print(f"Detected {len(data['champions'])} champions")
+
+ws = websocket.WebSocketApp("ws://127.0.0.1:8765/ws",
+                            on_message=on_message)
+ws.run_forever()
+```
+
+Potential applications:
+- LLM-powered coaching overlay
+- Jungle timer tracking
+- Map awareness training tools
+- Game replay analysis
+- Stream overlays
 
 ## Troubleshooting
 
-**Port in use:** `netstat -ano | findstr :8765` → `taskkill /PID <pid> /F`
-
-**Service won't start:** `python test_startup.py`
-
-**No detections:** Normal! Implement algorithms in `src/processing/pipeline.py`
-
-**Can't find minimap:** Set manual coords in `.env`:
-```env
-AUTO_DETECT_MINIMAP=false
-MINIMAP_X=1600
-MINIMAP_Y=800
-MINIMAP_WIDTH=250
-MINIMAP_HEIGHT=250
+**Port in use:**
+```bash
+netstat -ano | findstr :8765
+taskkill /PID <pid> /F
 ```
 
-**Low FPS:** Disable unused detections in `.env` or reduce `TARGET_FPS`
+**No champion detection:**
+- Riot API only available during active games
 
-## Tips
+**Minimap not captured correctly:**
+- Adjust `MINIMAP_X`, `MINIMAP_Y`, `MINIMAP_WIDTH`, `MINIMAP_HEIGHT` in `.env`
+- Use `/calibrate` endpoint or debug monitor recalibration
+- Game settings minimap size must be set to 59-62 range.
 
-1. Use Practice Tool (no time pressure)
-2. Start with champion detection (easiest)
-3. Tune HSV ranges for your graphics settings
-4. Keep processing under 50ms
-5. Enable only needed detections during dev
-6. Use browser console (F12) for debugging
+**Low FPS:**
+- Disable unused detections in `.env`
+- Reduce `TARGET_FPS`
