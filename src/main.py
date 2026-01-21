@@ -9,8 +9,10 @@ Priority: SPEED
 - Sub-50ms processing target
 """
 
+import json
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 
 import uvicorn
@@ -20,7 +22,7 @@ from fastapi.responses import FileResponse
 from loguru import logger
 
 from api.routes import router
-from config import settings
+from config import settings, PROJECT_ROOT
 from processing.pipeline import DetectionPipeline
 
 # Global state
@@ -28,16 +30,73 @@ start_time = time.time()
 pipeline: DetectionPipeline | None = None
 active_websockets: set[WebSocket] = set()
 
+# Debug logging state
+debug_log_file = None
+last_debug_log_time = 0
+DEBUG_LOG_INTERVAL = 5  # Log every 5 seconds
+
+
+def cleanup_old_logs(logs_dir: Path, max_files: int = 3) -> None:
+    """Remove oldest log files if more than max_files exist"""
+    log_files = sorted(logs_dir.glob("cv_output_*.jsonl"), key=lambda f: f.stat().st_mtime, reverse=True)
+
+    if len(log_files) > max_files:
+        for old_file in log_files[max_files:]:
+            logger.info(f"🗑️ Removing old log file: {old_file.name}")
+            old_file.unlink()
+
+
+def init_debug_log() -> Path | None:
+    """Initialize debug log file for this session"""
+    if not settings.DEBUG:
+        return None
+
+    logs_dir = PROJECT_ROOT / "logs"
+    logs_dir.mkdir(exist_ok=True)
+
+    # Cleanup old logs (keep max 3)
+    cleanup_old_logs(logs_dir, max_files=3)
+
+    # Create new log file with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = logs_dir / f"cv_output_{timestamp}.jsonl"
+
+    logger.info(f"📝 Debug log file: {log_file}")
+    return log_file
+
+
+def log_debug_output(result_dict: dict) -> None:
+    """Append result to debug log file (every 5 seconds)"""
+    global last_debug_log_time, debug_log_file
+
+    if debug_log_file is None:
+        return
+
+    current_time = time.time()
+    if current_time - last_debug_log_time < DEBUG_LOG_INTERVAL:
+        return
+
+    last_debug_log_time = current_time
+
+    try:
+        with open(debug_log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(result_dict) + "\n")
+    except Exception as e:
+        logger.warning(f"Failed to write debug log: {e}")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown"""
-    global pipeline
+    global pipeline, debug_log_file
 
     logger.info(f"🚀 League CV Service v{settings.VERSION}")
     logger.info(f"📡 Protocol: {settings.PROTOCOL.upper()}")
     logger.info(f"⚡ Target FPS: {settings.TARGET_FPS if settings.TARGET_FPS > 0 else 'Unlimited'}")
     logger.info(f"🎯 Max processing time: {settings.MAX_PROCESSING_TIME_MS}ms")
+
+    # Initialize debug logging (only in DEBUG mode)
+    debug_log_file = init_debug_log()
 
     # Initialize detection pipeline
     try:
@@ -151,6 +210,9 @@ async def websocket_endpoint(websocket: WebSocket):
             logger.debug(f"🔌 WebSocket sending: {len(result_dict.get('structures', []))} structures, "
                         f"{len(result_dict.get('champions', []))} champions, "
                         f"{len(result_dict.get('laneStates', []))} lane states")
+
+            # Write to debug log file (every 5 seconds in DEBUG mode)
+            log_debug_output(result_dict)
 
             # Send result (msgpack if enabled, else json)
             if settings.SERIALIZATION_FORMAT == "msgpack":

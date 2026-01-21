@@ -30,6 +30,11 @@ async def analyze_minimap(pipeline: DetectionPipeline = Depends(get_pipeline)):
     """
     try:
         result = await pipeline.analyze()
+
+        # Write to debug log file (every 5 seconds in DEBUG mode)
+        from main import log_debug_output
+        log_debug_output(result.model_dump())
+
         return result
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
