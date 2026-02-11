@@ -5,7 +5,7 @@ Real-time computer vision service for League of Legends minimap analysis. Captur
 
 **Tech Stack:** Python, FastAPI, WebSockets, OpenCV, NumPy, MSS (screen capture), Pydantic
 
-<video src="./models/clip.mp4" width="850" autoplay loop muted playsinline> </video>
+https://github.com/user-attachments/assets/23e7702c-c323-4634-847b-474a8084cbf8
 
 ## Features
 
