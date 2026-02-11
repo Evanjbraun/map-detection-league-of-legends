@@ -5,6 +5,8 @@ Real-time computer vision service for League of Legends minimap analysis. Captur
 
 **Tech Stack:** Python, FastAPI, WebSockets, OpenCV, NumPy, MSS (screen capture), Pydantic
 
+<video src="./models/clip.mp4" width="850" autoplay loop muted playsinline> </video>
+
 ## Features
 
 - **Champion Detection** - Identifies all 10 champions in-game using Riot's local API + template matching
